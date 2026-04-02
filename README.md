@@ -58,6 +58,19 @@ python alerta.py
 
 5. Crea una tarea programada para lanzar el script con la frecuencia que quieras.
 
+## GitHub Actions
+
+1. Sube el proyecto a un repositorio de GitHub.
+2. En `Settings > Secrets and variables > Actions > Secrets`, crea estos secretos:
+	- `TWILIO_ACCOUNT_SID`
+	- `TWILIO_AUTH_TOKEN`
+	- `TWILIO_WHATSAPP_NUMBER`
+	- `DESTINO_WHATSAPP_NUMBER`
+3. Revisa el workflow en `.github/workflows/alerta.yml` y ajusta si quieres `MAX_PRICE`, `MAX_MONTHLY_PAYMENT`, `EXCLUDE_KEYWORDS`, `MAX_ALERT_ITEMS` o `MAX_MESSAGE_CHARS`.
+4. En `Settings > Actions > General`, activa permisos `Read and write permissions` para que el workflow pueda actualizar `alert_state.json`.
+5. El workflow se ejecutará cada hora y también se puede lanzar manualmente desde la pestaña `Actions`.
+6. Cuando encuentre anuncios nuevos y los marque como vistos, hará commit automático del archivo `alert_state.json` para no repetir alertas en la siguiente ejecución.
+
 ## WhatsApp con Twilio
 
 1. Crea una cuenta en Twilio.
@@ -71,3 +84,4 @@ python alerta.py
 - Las webs pueden cambiar su HTML. Si dejan de salir resultados, revisa selectores y textos.
 - En PythonAnywhere conviene dejar `SEND_ONLY_NEW=true` para no repetir avisos.
 - Los mensajes de WhatsApp se envían agrupados por fuente y con solo la URL limpia para reducir tamaño.
+- En GitHub Actions, `alert_state.json` debe estar versionado para conservar el histórico entre ejecuciones.
