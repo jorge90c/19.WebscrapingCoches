@@ -9,6 +9,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
 from bs4 import BeautifulSoup
+from config import APP_CONFIG, build_source_urls
 from dotenv import load_dotenv
 from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
@@ -16,8 +17,6 @@ from twilio.rest import Client
 
 BASE_DIR = Path(__file__).resolve().parent
 STATE_FILE = BASE_DIR / "alert_state.json"
-DEFAULT_TIMEOUT = 20
-DEFAULT_MAX_MESSAGE_CHARS = 1400
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
@@ -47,31 +46,25 @@ class Source:
     href_contains: str
 
 
+SOURCE_URLS = build_source_urls(APP_CONFIG)
+
+
 SOURCES = [
     Source(
         name="Autohero",
-        url=(
-            "https://www.autohero.com/es/search/"
-            "?sort=financed_price_asc&priceType=fixed&priceMax=10000&transmission=automatic"
-        ),
+        url=SOURCE_URLS["Autohero"],
         link_selector='a[href*="/id/"]',
         href_contains="/id/",
     ),
     Source(
         name="Clicars",
-        url=(
-            "https://www.clicars.com/coches-segunda-mano-ocasion/automatico"
-            "?order=price.asc&priceMax=10000&financingMax=200"
-        ),
+        url=SOURCE_URLS["Clicars"],
         link_selector='a[href*="/comprar-"]',
         href_contains="/comprar-",
     ),
     Source(
         name="OcasionPlus",
-        url=(
-            "https://www.ocasionplus.com/coches-segunda-mano"
-            "?v2&orderBy=lowerPrice&cuote%5Bto%5D=150&transmission=AUTO"
-        ),
+        url=SOURCE_URLS["OcasionPlus"],
         link_selector='a[href*="/coches-segunda-mano/"]',
         href_contains="/coches-segunda-mano/",
     ),
@@ -80,30 +73,6 @@ SOURCES = [
 
 def load_env() -> None:
     load_dotenv(BASE_DIR / ".env")
-
-
-def env_float(name: str, default: float | None = None) -> float | None:
-    value = os.getenv(name)
-    if value is None or not value.strip():
-        return default
-    return float(value.strip().replace(",", "."))
-
-
-def env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "si", "sí", "on"}
-
-
-def env_list(name: str, default: str = "") -> list[str]:
-    value = os.getenv(name, default)
-    items = []
-    for part in value.split(","):
-        cleaned = part.strip().lower()
-        if cleaned:
-            items.append(cleaned)
-    return items
 
 
 def make_session() -> requests.Session:
@@ -118,8 +87,7 @@ def make_session() -> requests.Session:
 
 
 def fetch_html(session: requests.Session, url: str) -> str:
-    timeout = int(env_float("REQUEST_TIMEOUT", DEFAULT_TIMEOUT) or DEFAULT_TIMEOUT)
-    response = session.get(url, timeout=timeout)
+    response = session.get(url, timeout=APP_CONFIG.request_timeout)
     response.raise_for_status()
     return response.text
 
@@ -239,21 +207,14 @@ def parse_source(session: requests.Session, source: Source) -> list[Listing]:
 
 def listing_matches_filters(listing: Listing) -> bool:
     haystack = clean_text(f"{listing.title} {listing.url}").lower()
-    exclude_keywords = env_list("EXCLUDE_KEYWORDS", "puretech")
-    max_price = env_float("MAX_PRICE")
-    max_monthly_payment = env_float("MAX_MONTHLY_PAYMENT")
 
-    if any(keyword in haystack for keyword in exclude_keywords):
+    if any(keyword in haystack for keyword in APP_CONFIG.exclude_keywords):
         return False
 
-    if max_price is not None and listing.price is not None and listing.price > max_price:
+    if listing.price is not None and listing.price > APP_CONFIG.max_price:
         return False
 
-    if (
-        max_monthly_payment is not None
-        and listing.monthly_payment is not None
-        and listing.monthly_payment > max_monthly_payment
-    ):
+    if listing.monthly_payment is not None and listing.monthly_payment > APP_CONFIG.max_monthly_payment:
         return False
 
     return True
@@ -334,14 +295,13 @@ def normalize_message_lines(lines: list[str], max_chars: int) -> list[str]:
 
 
 def build_message_chunks(lines: list[str]) -> list[str]:
-    max_chars = int(env_float("MAX_MESSAGE_CHARS", DEFAULT_MAX_MESSAGE_CHARS) or DEFAULT_MAX_MESSAGE_CHARS)
-    normalized_lines = normalize_message_lines(lines, max_chars)
+    normalized_lines = normalize_message_lines(lines, APP_CONFIG.max_message_chars)
     chunks: list[str] = []
     current_chunk = ""
 
     for line in normalized_lines:
         candidate = line if not current_chunk else f"{current_chunk}\n{line}"
-        if current_chunk and len(candidate) > max_chars:
+        if current_chunk and len(candidate) > APP_CONFIG.max_message_chars:
             chunks.append(current_chunk)
             current_chunk = line
             continue
@@ -396,7 +356,7 @@ def collect_matches() -> list[Listing]:
 
 
 def only_new_matches(listings: list[Listing]) -> list[Listing]:
-    if not env_bool("SEND_ONLY_NEW", True):
+    if not APP_CONFIG.send_only_new:
         return listings
 
     seen_urls = load_seen_urls()
@@ -417,8 +377,7 @@ def main() -> None:
         logging.info("No hay coches nuevos que alertar.")
         return
 
-    limit = int(env_float("MAX_ALERT_ITEMS", 10) or 10)
-    selected = pending[:limit]
+    selected = pending[: APP_CONFIG.max_alert_items]
     grouped_lines = build_grouped_lines(selected)
     messages = build_message_chunks(grouped_lines)
 

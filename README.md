@@ -18,8 +18,9 @@ pip install -r requirements.txt
 ```
 
 3. Crea un archivo `.env` copiando `.env.example`.
-4. Rellena tus credenciales de Twilio y ajusta los filtros.
-5. Ejecuta el script:
+4. Rellena tus credenciales de Twilio.
+5. Ajusta los filtros versionados en `config.py`.
+6. Ejecuta el script:
 
 ```powershell
 python alerta.py
@@ -27,22 +28,28 @@ python alerta.py
 
 Si faltan las credenciales de Twilio, el script no fallará: imprimirá por consola las coincidencias encontradas.
 
-## Variables importantes
+## Credenciales y configuración
 
 - `TWILIO_ACCOUNT_SID`: SID de tu cuenta Twilio.
 - `TWILIO_AUTH_TOKEN`: token de autenticación.
 - `TWILIO_WHATSAPP_NUMBER`: número del sandbox o número aprobado por Twilio.
 - `DESTINO_WHATSAPP_NUMBER`: tu número en formato `whatsapp:+34...`.
-- `MAX_PRICE`: precio máximo aceptado.
-- `MAX_MONTHLY_PAYMENT`: cuota máxima aceptada.
-- `EXCLUDE_KEYWORDS`: palabras a excluir separadas por comas.
-- `SEND_ONLY_NEW`: evita alertas repetidas usando `alert_state.json`.
-- `MAX_ALERT_ITEMS`: máximo de enlaces incluidos por ejecución.
-- `MAX_MESSAGE_CHARS`: límite por bloque de mensaje antes de dividirlo.
+
+Las credenciales de Twilio se leen desde `.env`.
+
+La configuración funcional se versiona en `config.py`:
+
+- `max_price`: precio máximo aceptado.
+- `max_monthly_payment`: cuota máxima aceptada.
+- `exclude_keywords`: palabras a excluir.
+- `send_only_new`: evita alertas repetidas usando `alert_state.json`.
+- `max_alert_items`: máximo de enlaces incluidos por ejecución.
+- `max_message_chars`: límite por bloque de mensaje antes de dividirlo.
+- `request_timeout`: timeout de las peticiones HTTP.
 
 ## PythonAnywhere
 
-1. Sube `alerta.py`, `requirements.txt` y tu `.env` al directorio del proyecto.
+1. Sube `alerta.py`, `config.py`, `requirements.txt` y tu `.env` al directorio del proyecto.
 2. Crea un virtualenv en PythonAnywhere.
 3. Instala dependencias dentro del virtualenv:
 
@@ -66,7 +73,7 @@ python alerta.py
 	- `TWILIO_AUTH_TOKEN`
 	- `TWILIO_WHATSAPP_NUMBER`
 	- `DESTINO_WHATSAPP_NUMBER`
-3. Revisa el workflow en `.github/workflows/alerta.yml` y ajusta si quieres `MAX_PRICE`, `MAX_MONTHLY_PAYMENT`, `EXCLUDE_KEYWORDS`, `MAX_ALERT_ITEMS` o `MAX_MESSAGE_CHARS`.
+3. Ajusta en `config.py` los filtros como `max_price`, `max_monthly_payment`, `exclude_keywords` o `max_alert_items` si lo necesitas.
 4. En `Settings > Actions > General`, activa permisos `Read and write permissions` para que el workflow pueda actualizar `alert_state.json`.
 5. El workflow se ejecutará cada hora y también se puede lanzar manualmente desde la pestaña `Actions`.
 6. Cuando encuentre anuncios nuevos y los marque como vistos, hará commit automático del archivo `alert_state.json` para no repetir alertas en la siguiente ejecución.

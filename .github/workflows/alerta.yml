@@ -20,13 +20,6 @@ jobs:
       TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
       TWILIO_WHATSAPP_NUMBER: ${{ secrets.TWILIO_WHATSAPP_NUMBER }}
       DESTINO_WHATSAPP_NUMBER: ${{ secrets.DESTINO_WHATSAPP_NUMBER }}
-      MAX_PRICE: "10000"
-      MAX_MONTHLY_PAYMENT: "150"
-      EXCLUDE_KEYWORDS: "puretech"
-      SEND_ONLY_NEW: "true"
-      MAX_ALERT_ITEMS: "10"
-      MAX_MESSAGE_CHARS: "1400"
-      REQUEST_TIMEOUT: "20"
 
     steps:
       - name: Checkout repository
