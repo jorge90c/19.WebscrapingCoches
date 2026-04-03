@@ -68,6 +68,12 @@ SOURCES = [
         link_selector='a[href*="/coches-segunda-mano/"]',
         href_contains="/coches-segunda-mano/",
     ),
+    Source(
+        name="Flexicar",
+        url=SOURCE_URLS["Flexicar"],
+        link_selector='a[href*="/coches-ocasion/"]',
+        href_contains="/coches-ocasion/",
+    ),
 ]
 
 
@@ -161,6 +167,10 @@ def extract_title(text: str, source: Source) -> str:
             return clean_text(title_match.group(1))
     if source.name == "OcasionPlus":
         title_match = re.search(r"de segunda mano\s+(.+?)\s+(?:\d+[.]?\d*€|desde)", text, re.IGNORECASE)
+        if title_match:
+            return clean_text(title_match.group(1))
+    if source.name == "Flexicar":
+        title_match = re.search(r"financiaci[oó]n\s+(.+?)\s+\d{4}\s+\d[\d. ,]*\s*km", text, re.IGNORECASE)
         if title_match:
             return clean_text(title_match.group(1))
     return text[:140]
@@ -384,7 +394,7 @@ def main() -> None:
     sent = notify_whatsapp(messages)
     if sent:
         all_seen = load_seen_urls()
-        all_seen.update(listing.url for listing in pending)
+        all_seen.update(listing.url for listing in selected)
         save_seen_urls(all_seen)
 
     if not sent:

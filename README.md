@@ -7,6 +7,7 @@ Fuentes incluidas:
 - Autohero
 - Clicars
 - OcasionPlus
+- Flexicar
 
 ## Preparación local
 
