@@ -11,8 +11,6 @@ import requests
 from bs4 import BeautifulSoup
 from config import APP_CONFIG, build_source_urls
 from dotenv import load_dotenv
-from twilio.base.exceptions import TwilioRestException
-from twilio.rest import Client
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,6 +25,7 @@ MONTHLY_PAYMENT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 AUTOHERO_DISCOUNT_PATTERN = re.compile(r"^Ahorra\s+(?<!\d)\d[\d. ,]*\s*€\s*", re.IGNORECASE)
+TELEGRAM_API_BASE_URL = "https://api.telegram.org"
 
 
 @dataclass(frozen=True)
@@ -75,7 +74,6 @@ SOURCES = [
         href_contains="/coches-ocasion/",
     ),
 ]
-
 
 def load_env() -> None:
     load_dotenv(BASE_DIR / ".env")
@@ -324,27 +322,36 @@ def build_message_chunks(lines: list[str]) -> list[str]:
     return chunks
 
 
-def notify_whatsapp(messages: list[str]) -> bool:
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
-    from_number = os.getenv("TWILIO_WHATSAPP_NUMBER", "").strip()
-    to_number = os.getenv("DESTINO_WHATSAPP_NUMBER", "").strip()
+def notify_telegram(messages: list[str]) -> bool:
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
-    if not all([account_sid, auth_token, from_number, to_number]):
-        logging.warning("Faltan variables de entorno de Twilio. No se enviará WhatsApp.")
+    if not all([bot_token, chat_id]):
+        logging.warning("Faltan variables de entorno de Telegram. No se enviará el mensaje.")
         return False
 
+    endpoint = f"{TELEGRAM_API_BASE_URL}/bot{bot_token}/sendMessage"
+
     try:
-        client = Client(account_sid, auth_token)
         for message in messages:
-            message_response = client.messages.create(
-                body=message,
-                from_=from_number,
-                to=to_number,
+            response = requests.post(
+                endpoint,
+                json={
+                    "chat_id": chat_id,
+                    "text": message,
+                    "disable_web_page_preview": True,
+                },
+                timeout=APP_CONFIG.request_timeout,
             )
-            logging.info("Mensaje enviado con SID %s", message_response.sid)
-    except TwilioRestException as exc:
-        logging.error("Error enviando WhatsApp: %s", exc)
+            response.raise_for_status()
+            payload = response.json()
+            if not payload.get("ok"):
+                logging.error("Telegram rechazo el mensaje: %s", payload)
+                return False
+
+            logging.info("Mensaje enviado a Telegram con message_id=%s", payload["result"]["message_id"])
+    except requests.RequestException as exc:
+        logging.error("Error enviando a Telegram: %s", exc)
         return False
 
     return True
@@ -391,7 +398,7 @@ def main() -> None:
     grouped_lines = build_grouped_lines(selected)
     messages = build_message_chunks(grouped_lines)
 
-    sent = notify_whatsapp(messages)
+    sent = notify_telegram(messages)
     if sent:
         all_seen = load_seen_urls()
         all_seen.update(listing.url for listing in selected)
